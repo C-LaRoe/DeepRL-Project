@@ -1,7 +1,5 @@
-from turtle import back
 import pygame
 import math
-import numpy as np
 import time
 import random as rd
 pygame.init()
@@ -100,12 +98,8 @@ class Explosion(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
         self.image = pygame.image.load("sprites/explosion.png")
-        self.small_image = pygame.transform.scale(self.image, (int(self.image.get_size()[0]*2),int(self.image.get_size()[1])))
-        self.rect = self.bigger_image.get_rect()
-
-    def draw(self, screen):
-        screen.blit(self.bigger_image, (0,Y_DIM - self.bigger_image.get_size()[1]))
-
+        self.small_image = pygame.transform.scale(self.image, (int(self.image.get_size()[0]*3),int(self.image.get_size()[1]*3)))
+        # self.rect = self.bigger_image.get_rect()
 
 
 screen = pygame.display.set_mode([X_DIM,Y_DIM])
@@ -152,9 +146,20 @@ while running:
 
     target_missile.draw(screen)
     # pygame.draw.rect(screen, (0,255,0) , target_missile.rect) # Draw collision box of target
+    # Missile Hit Ground
+    if target_missile.y_t > Y_DIM-124:
+        screen.blit(small_explosion_img, (target_missile.x_t-15, target_missile.y_t))
+        pygame.display.flip()
+        score -= 10
+        time.sleep(1)
+        target_missile = Missile()
+        user_missile = UserMissile()
+
     target_missile.update_pos()
 
-    if target_missile.y_t > Y_DIM:
+        
+    # check if target missile went off screen
+    if target_missile.x_t > X_DIM or target_missile.x_t < 0:
         # reset target missile
         target_missile = Missile()
 
