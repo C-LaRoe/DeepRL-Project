@@ -2,7 +2,6 @@ import pygame
 import math
 import time
 import random as rd
-pygame.init()
 
 X_DIM = 700
 Y_DIM = 700
@@ -10,10 +9,16 @@ Y_DIM = 700
 class Missile(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-
-        self.x_t = rd.randint(100, X_DIM-100)
+        
+        self.x_t = rd.randint(50, X_DIM-50)
         self.y_t = 0
-        self.theta = rd.randint(200, 280)
+        destination_x = rd.randint(50, X_DIM-50)
+        if destination_x == self.x_t:
+            self.theta = -90
+        elif destination_x > self.x_t:
+            self.theta = -(180/math.pi) * math.atan(Y_DIM/(destination_x - self.x_t))
+        else:
+            self.theta = -90 + (180/math.pi) * math.atan((destination_x - self.x_t)/Y_DIM)
         self.v = rd.randint(5,10)
 
         self.image = pygame.image.load("sprites/missile3.png")
@@ -102,6 +107,7 @@ class Explosion(pygame.sprite.Sprite):
         # self.rect = self.bigger_image.get_rect()
 
 
+pygame.init()
 screen = pygame.display.set_mode([X_DIM,Y_DIM])
 background_color = (199, 250, 252)
 target_missile = Missile()
