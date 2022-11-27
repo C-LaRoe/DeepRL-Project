@@ -2,8 +2,9 @@ import numpy as np
 import gym
 from gym import spaces
 import pygame
-from stable_baselines3 import PPO, A2C
+from stable_baselines3 import PPO, A2C, DDPG
 from stable_baselines3.common.env_checker import check_env
+from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 import math
 import time
 import random as rd
@@ -24,14 +25,17 @@ class Missile(pygame.sprite.Sprite):
             # Generate random trajectory in the environment for the target missile to take
             self.x_t = rd.randint(50, X_DIM-50)
             self.y_t = 0
+            # self.x_t = 250
+            # self.y_t = 350
             destination_x = rd.randint(50, X_DIM-50)
+            # destination_x = 360
             if destination_x == self.x_t:
                 self.theta = -90
             elif destination_x > self.x_t:
                 self.theta = -(180/math.pi) * math.atan(Y_DIM/(destination_x - self.x_t))
             else:
                 self.theta = -90 + (180/math.pi) * math.atan((destination_x - self.x_t)/Y_DIM)
-            self.v = rd.randint(6,8)
+            self.v = rd.randint(3,4)
 
         self.image = pygame.image.load("sprites/missile3.png")
         self.small_image = pygame.transform.scale(self.image, (int(self.image.get_size()[0]/7),int(self.image.get_size()[1]/7)))
@@ -67,17 +71,20 @@ class Ground(pygame.sprite.Sprite):
         screen.blit(self.bigger_image, (0,Y_DIM - self.bigger_image.get_size()[1]))
 
 
-class MissileEnv(gym.Env):
-    def __init__(self):
+class MissileEnv(gym.Env): 
+    metadata = {'render.modes': ['human']}
+    def __init__(self, display=True):
         super().__init__()
 
+        self.display = display
         self.X_DIM = X_DIM
         self.Y_DIM = Y_DIM
 
-        pygame.init()
-        self.screen = pygame.display.set_mode([X_DIM, Y_DIM])
-        self.background_color = (199, 250, 252)
-        self.ground = Ground()
+        if display:
+            pygame.init()
+            self.screen = pygame.display.set_mode([X_DIM, Y_DIM])
+            self.background_color = (199, 250, 252)
+            self.ground = Ground()
 
         self.agent_missile = Missile("agent")
         self.target_missile = Missile("target")
@@ -131,43 +138,60 @@ class MissileEnv(gym.Env):
         if self.agent_missile.v + action[0] >= 3 and self.agent_missile.v + action[0] <= 15:
             self.agent_missile.v += action[0] # Change v
 
+        agent_missile_x = self.agent_missile.x_t
+        agent_missile_y = self.agent_missile.y_t
+        target_missile_x = self.target_missile.x_t
+        target_missile_y = self.target_missile.y_t
+        distance = math.sqrt((agent_missile_x - target_missile_x)**2 + (agent_missile_y - target_missile_y)**2)
+
         self.agent_missile.update_pos()
         self.target_missile.update_pos()
-        self.agent_missile.draw(self.screen)
-        self.target_missile.draw(self.screen)
-        self.ground.draw(self.screen)
-        pygame.display.flip()
-        # pygame.draw.rect(screen, (0,255,0) , target_missile.rect) # Draw collision box of target
+        if self.display:
+            self.agent_missile.draw(self.screen)
+            self.target_missile.draw(self.screen)
+            self.ground.draw(self.screen)
+            pygame.display.flip()
+            # pygame.draw.rect(screen, (0,255,0) , target_missile.rect) # Draw collision box of target
+            self.screen.fill(self.background_color)
 
-        self.screen.fill(self.background_color)
-        # If agent missile has hit ground or gone outside the bounds of the environment 
-        if self.agent_missile.y_t > Y_DIM-124 or self.agent_missile.y_t < 0 or self.agent_missile.x_t > X_DIM or self.agent_missile.x_t < 0:
-            reward = -100
-            done = True
+        # # If agent missile has hit ground or gone outside the bounds of the environment 
+        # if self.agent_missile.y_t > Y_DIM-124 or self.agent_missile.y_t < 0 or self.agent_missile.x_t > X_DIM or self.agent_missile.x_t < 0:
+        #     reward = -1000
+        #     done = True
 
         # Target missile hit ground
-        elif self.target_missile.y_t > Y_DIM-124:
-            self.screen.blit(self.explosion_img, (self.target_missile.x_t-15, self.target_missile.y_t))
-            pygame.display.flip()
-            time.sleep(0.1)
-            reward = -100
+        if self.target_missile.y_t > Y_DIM-124:
+            if self.display:
+                self.screen.blit(self.explosion_img, (self.target_missile.x_t-15, self.target_missile.y_t))
+                pygame.display.flip()
+                time.sleep(0.1)
+            reward = -1000
             done = True
 
         # If there is a missile to missile collision
         elif self.agent_missile.rect.colliderect(self.target_missile.rect):
-            self.screen.blit(self.explosion_img, (self.target_missile.x_t, self.target_missile.y_t))
-            pygame.display.flip()
-            time.sleep(0.1)
-            reward = 100
+            if self.display:
+                self.screen.blit(self.explosion_img, (self.target_missile.x_t, self.target_missile.y_t))
+                pygame.display.flip()
+                time.sleep(0.1)
+            reward = 1000
             done = True
 
         else: # No collisions occured
             # Give reward based on current distance between agent and target missile
-            reward = 10 / math.sqrt((self.target_missile.x_t - self.agent_missile.x_t) ** 2 + (self.target_missile.y_t - self.agent_missile.y_t) ** 2)
+            # reward = 10 / math.sqrt((self.target_missile.x_t - self.agent_missile.x_t) ** 2 + (self.target_missile.y_t - self.agent_missile.y_t) ** 2)
+            agent_missile_x = self.agent_missile.x_t
+            agent_missile_y = self.agent_missile.y_t
+            target_missile_x = self.target_missile.x_t
+            target_missile_y = self.target_missile.y_t
+            distance_plus_one = math.sqrt((agent_missile_x - target_missile_x)**2 + (agent_missile_y - target_missile_y)**2)
+            reward = distance - distance_plus_one
+            # print(reward)
             done = False
 
-        time.sleep(0.009)
-        pygame.display.flip()
+        if self.display:
+            time.sleep(0.009)
+            pygame.display.flip()
 
         # observation = {
         #             "agent_x": self.agent_missile.x_t,
@@ -179,6 +203,7 @@ class MissileEnv(gym.Env):
         #             "target_theta": self.target_missile.theta,
         #             "target_v": self.target_missile.v,
         #         }
+
         observation = np.array([self.agent_missile.x_t,self.agent_missile.y_t,self.agent_missile.theta,self.agent_missile.v,
                                 self.target_missile.x_t,self.target_missile.y_t,self.target_missile.theta,self.target_missile.v], dtype=np.float32)
         return observation, reward, done, {}
@@ -189,9 +214,6 @@ class MissileEnv(gym.Env):
         observation = np.array([self.agent_missile.x_t, self.agent_missile.y_t, self.agent_missile.theta, self.agent_missile.v,
                                 self.target_missile.x_t, self.target_missile.y_t, self.target_missile.theta, self.target_missile.v], dtype=np.float32)
 
-        # print(self.observation_space.shape)
-        # print(self.observation_space.dtype)
-        # print(observation)
         return observation
         # return {
         #             "agent_x": self.agent_missile.x_t,
@@ -204,31 +226,53 @@ class MissileEnv(gym.Env):
         #             "target_v": self.target_missile.v,
         #         }   
 
+    def set_display(self, show):
+        if show:
+            self.display = True
+            pygame.init()
+            self.screen = pygame.display.set_mode([X_DIM, Y_DIM])
+            self.background_color = (199, 250, 252)
+            self.ground = Ground()
+        else:
+            self.display = False
+            pygame.quit()
+
 
 def main():
-    env = MissileEnv()
-    # check_env(env)
-    t1 = time.time()
+    env = MissileEnv(display=False)
     # model = A2C.load("a2c_missile")
-    model = A2C("MlpPolicy", env)
-    model.learn(total_timesteps=10000)
-    # model = A2C("MlpPolicy", env, verbose=1)
-    model.save("a2c_missile")
-    t2 = time.time()
-    print(t2 - t1, "seconds")
+    n_actions = env.action_space.shape[-1]
+    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.2 * np.ones(n_actions))
+    model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=0)
+
+    print("Training....")
+    model.learn(total_timesteps=3000)
+    env.set_display(True)
+    obs = env.reset()
+    print("Testing")
+    for _ in range(1000):
+        action, _states = model.predict(obs)
+        obs, rewards, done, info = env.step(action)
+        if done:
+            env.reset()
+    env.set_display(False)
+
+    print("Training....")
+    model.learn(total_timesteps=3000)
 
     print("DONE TRAINING")
 
-    # del model # remove to demonstrate saving and loading
+    env.set_display(True)
+    print("Testing")
+    for _ in range(1000):
+        action, _states = model.predict(obs)
+        obs, rewards, done, info = env.step(action)
+        if done:
+            env.reset()
+    env.set_display(False)
 
-    # model = PPO.load("a2c_missile")
+    # model.save("a2c_missile")
 
-    # obs = env.reset()
-    # while True:
-    #     action, _states = model.predict(obs)
-    #     obs, rewards, done, info = env.step(action)
-    #     if done:
-    #         env.reset()
 
 if __name__ == "__main__":
     main()
