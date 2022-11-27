@@ -8,15 +8,15 @@ from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckA
 import math
 import time
 import random as rd
-X_DIM = 700
-Y_DIM = 700
+X_DIM = 800
+Y_DIM = 800
 
 class Missile(pygame.sprite.Sprite):
     def __init__(self, type):
         super().__init__()
         
         if type == "agent":
-            self.x_t = 0
+            self.x_t = 100
             self.y_t = Y_DIM - 124
             self.theta = 45
             self.v = 3
@@ -35,6 +35,8 @@ class Missile(pygame.sprite.Sprite):
                 self.theta = -(180/math.pi) * math.atan(Y_DIM/(destination_x - self.x_t))
             else:
                 self.theta = -90 + (180/math.pi) * math.atan((destination_x - self.x_t)/Y_DIM)
+            if self.theta < 0:
+                self.theta += 360 
             self.v = rd.randint(3,4)
 
         self.image = pygame.image.load("sprites/missile3.png")
@@ -46,6 +48,10 @@ class Missile(pygame.sprite.Sprite):
         self.rect.y = self.y_t
 
     def update_pos(self):
+        if self.theta < 0:
+            self.theta += 360
+        elif self.theta > 360:
+            self.theta = self.theta % 360
         rad_theta = (math.pi / 180) * self.theta
         delta_x = self.v * math.cos(rad_theta)
         delta_y = self.v * math.sin(rad_theta)
@@ -84,8 +90,9 @@ class MissileEnv(gym.Env):
             pygame.init()
             self.screen = pygame.display.set_mode([X_DIM, Y_DIM])
             self.background_color = (199, 250, 252)
-            self.ground = Ground()
+            # self.ground = Ground()
 
+        self.t = 1
         self.agent_missile = Missile("agent")
         self.target_missile = Missile("target")
         explosion_img = pygame.image.load("sprites/explosion.png")
@@ -112,22 +119,18 @@ class MissileEnv(gym.Env):
         self.observation_space = spaces.Box(low=np.array([
                                                             0,
                                                             0,
-                                                            -360,
-                                                            3,
                                                             0,
                                                             0,
-                                                            -360,
-                                                            3
+                                                            0,
+                                                            0,
                                                         ]).astype(np.float32),
                                             high=np.array([
                                                             self.X_DIM,
                                                             self.Y_DIM,
                                                             360,
-                                                            15,
                                                             self.X_DIM,
                                                             self.Y_DIM,
                                                             360,
-                                                            12,
                                                         ]).astype(np.float32)
                                                     )
 
@@ -149,7 +152,7 @@ class MissileEnv(gym.Env):
         if self.display:
             self.agent_missile.draw(self.screen)
             self.target_missile.draw(self.screen)
-            self.ground.draw(self.screen)
+            # self.ground.draw(self.screen)
             pygame.display.flip()
             # pygame.draw.rect(screen, (0,255,0) , target_missile.rect) # Draw collision box of target
             self.screen.fill(self.background_color)
@@ -185,12 +188,14 @@ class MissileEnv(gym.Env):
             target_missile_x = self.target_missile.x_t
             target_missile_y = self.target_missile.y_t
             distance_plus_one = math.sqrt((agent_missile_x - target_missile_x)**2 + (agent_missile_y - target_missile_y)**2)
-            reward = distance - distance_plus_one
+            reward = (distance - distance_plus_one) / self.t
+            self.t += 1
             # print(reward)
             done = False
 
+        print("t=", self.t, round(reward,4))
         if self.display:
-            time.sleep(0.009)
+            time.sleep(0.1)
             pygame.display.flip()
 
         # observation = {
@@ -204,15 +209,20 @@ class MissileEnv(gym.Env):
         #             "target_v": self.target_missile.v,
         #         }
 
-        observation = np.array([self.agent_missile.x_t,self.agent_missile.y_t,self.agent_missile.theta,self.agent_missile.v,
-                                self.target_missile.x_t,self.target_missile.y_t,self.target_missile.theta,self.target_missile.v], dtype=np.float32)
+        # observation = np.array([self.agent_missile.x_t,self.agent_missile.y_t,self.agent_missile.theta,self.agent_missile.v,
+        #                         self.target_missile.x_t,self.target_missile.y_t,self.target_missile.theta,self.target_missile.v], dtype=np.float32)
+        observation = np.array([self.agent_missile.x_t, self.agent_missile.y_t, self.agent_missile.theta,
+                                self.target_missile.x_t, self.target_missile.y_t, self.target_missile.theta], dtype=np.float32)
         return observation, reward, done, {}
 
     def reset(self):
         self.agent_missile = Missile(type="agent")
         self.target_missile = Missile(type="target")
-        observation = np.array([self.agent_missile.x_t, self.agent_missile.y_t, self.agent_missile.theta, self.agent_missile.v,
-                                self.target_missile.x_t, self.target_missile.y_t, self.target_missile.theta, self.target_missile.v], dtype=np.float32)
+        self.t = 1
+        # observation = np.array([self.agent_missile.x_t, self.agent_missile.y_t, self.agent_missile.theta, self.agent_missile.v,
+        #                         self.target_missile.x_t, self.target_missile.y_t, self.target_missile.theta, self.target_missile.v], dtype=np.float32)
+        observation = np.array([self.agent_missile.x_t, self.agent_missile.y_t, self.agent_missile.theta,
+                                self.target_missile.x_t, self.target_missile.y_t, self.target_missile.theta], dtype=np.float32)
 
         return observation
         # return {
@@ -232,25 +242,26 @@ class MissileEnv(gym.Env):
             pygame.init()
             self.screen = pygame.display.set_mode([X_DIM, Y_DIM])
             self.background_color = (199, 250, 252)
-            self.ground = Ground()
+            # self.ground = Ground()
         else:
             self.display = False
             pygame.quit()
 
 
 def main():
-    env = MissileEnv(display=False)
+    env = MissileEnv(display=True)
     # model = A2C.load("a2c_missile")
     n_actions = env.action_space.shape[-1]
     action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.2 * np.ones(n_actions))
-    model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=0)
+    model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1)
 
     print("Training....")
-    model.learn(total_timesteps=3000)
+    model.learn(total_timesteps=1000, log_interval=15)
     env.set_display(True)
     obs = env.reset()
-    print("Testing")
-    for _ in range(1000):
+    time.sleep(5)
+    print("Testing....")
+    for _ in range(10000):
         action, _states = model.predict(obs)
         obs, rewards, done, info = env.step(action)
         if done:
@@ -258,12 +269,10 @@ def main():
     env.set_display(False)
 
     print("Training....")
-    model.learn(total_timesteps=3000)
-
-    print("DONE TRAINING")
+    model.learn(total_timesteps=1000)
 
     env.set_display(True)
-    print("Testing")
+    print("Testing....")
     for _ in range(1000):
         action, _states = model.predict(obs)
         obs, rewards, done, info = env.step(action)
