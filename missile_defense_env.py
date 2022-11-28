@@ -19,7 +19,7 @@ class Missile(pygame.sprite.Sprite):
             self.x_t = 100
             self.y_t = Y_DIM - 124
             self.theta = 45
-            self.v = 3
+            self.v = 5
         
         else:
             # Generate random trajectory in the environment for the target missile to take
@@ -37,7 +37,8 @@ class Missile(pygame.sprite.Sprite):
                 self.theta = -90 + (180/math.pi) * math.atan((destination_x - self.x_t)/Y_DIM)
             if self.theta < 0:
                 self.theta += 360 
-            self.v = rd.randint(3,4)
+            # self.v = rd.randint(3,4)
+            self.v = 3
 
         self.image = pygame.image.load("sprites/missile3.png")
         self.small_image = pygame.transform.scale(self.image, (int(self.image.get_size()[0]/7),int(self.image.get_size()[1]/7)))
@@ -102,7 +103,8 @@ class MissileEnv(gym.Env):
         # Action Space
         # Change velocity by value in range [-2, 2]
         # Change theta by value in range [-15, 15]
-        self.action_space = spaces.Box(np.array([-2,-15]),np.array([2,15]))
+        # self.action_space = spaces.Box(np.array([-2,-15]),np.array([2,15]))
+        self.action_space = spaces.Box(np.array([-15]),np.array([15]))
         
         # State Space
         # self.observation_space = spaces.Dict(
@@ -137,9 +139,9 @@ class MissileEnv(gym.Env):
     def step(self, action):
         # print(action)       
         # Need to update agent missile theta and v based on the action passed as a parameter
-        self.agent_missile.theta += action[1] # Change theta
-        if self.agent_missile.v + action[0] >= 3 and self.agent_missile.v + action[0] <= 15:
-            self.agent_missile.v += action[0] # Change v
+        self.agent_missile.theta += action[0] # Change theta
+        # if self.agent_missile.v + action[0] >= 3 and self.agent_missile.v + action[0] <= 15:
+        #     self.agent_missile.v += action[0] # Change v
 
         agent_missile_x = self.agent_missile.x_t
         agent_missile_y = self.agent_missile.y_t
