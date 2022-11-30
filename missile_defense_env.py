@@ -159,16 +159,16 @@ class MissileEnv(gym.Env):
             self.screen.fill(self.background_color)
 
         # Target missile hit ground
-        if self.target_missile.y_t > Y_DIM-124:
-            if self.display:
-                self.screen.blit(self.explosion_img, (self.target_missile.x_t-15, self.target_missile.y_t))
-                pygame.display.flip()
-                time.sleep(0.1)
-            reward = -1000
-            done = True
+        # if self.target_missile.y_t > Y_DIM-124:
+        #     if self.display:
+        #         self.screen.blit(self.explosion_img, (self.target_missile.x_t-15, self.target_missile.y_t))
+        #         pygame.display.flip()
+        #         time.sleep(0.1)
+        #     reward = -1000
+        #     done = True
 
         # If there is a missile to missile collision
-        elif self.agent_missile.rect.colliderect(self.target_missile.rect):
+        if self.agent_missile.rect.colliderect(self.target_missile.rect):
             if self.display:
                 self.screen.blit(self.explosion_img, (self.target_missile.x_t, self.target_missile.y_t))
                 pygame.display.flip()
@@ -251,7 +251,8 @@ def main():
     # model = A2C.load("a2c_missile")
     n_actions = env.action_space.shape[-1]
     action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=4 * np.ones(n_actions))
-    model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1)
+    # model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1)
+    model = A2C("MlpPolicy", env=env)
 
     print("Training....")
     model.learn(total_timesteps=5000)
