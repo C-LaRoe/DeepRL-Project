@@ -4,7 +4,7 @@ from gym import spaces
 import pygame
 from stable_baselines3 import PPO, A2C, DDPG, TD3
 from stable_baselines3.common.env_checker import check_env
-from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
+from stable_baselines3.common.noise import NormalActionNoise
 import math
 import time
 import random as rd
@@ -198,7 +198,7 @@ class MissileEnv(gym.Env):
 
         if self.t == 400:
             done = True
-        print("t=", self.t, round(reward,4))
+        # print("t=", self.t, round(reward,4))
         if self.display:
             time.sleep(0.009)
             pygame.display.flip()
@@ -258,21 +258,37 @@ class MissileEnv(gym.Env):
                 self.display = False
                 pygame.quit()
 
+def main():
+    print("YO")
+    env = gym.make("Pendulum-v1")
+    n_actions = env.action_space.shape[-1]
+    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.5 * np.ones(n_actions))
+    model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1)
+    model.learn(total_timesteps=2000)
+    obs = env.reset()
+    for _ in range(20000):
+        action, _states = model.predict(obs)
+        obs, rewards, done, info = env.step(action)
+        env.render()
+        if done:
+            env.reset()
 
 def main():
     env = MissileEnv(display=True)
     # model = A2C.load("a2c_missile")
     n_actions = env.action_space.shape[-1]
     action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=4 * np.ones(n_actions))
-    model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1)
+    # model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1)
+    model = A2C("MlpPolicy", env)
 
     print("Training....")
-    model.learn(total_timesteps=10000)
+    model.learn(total_timesteps=1000)
     env.set_display(True)
     obs = env.reset()
     time.sleep(5)
     print("Testing....")
-    for _ in range(10000):
+    # for _ in range(1000):
+    while True:
         action, _states = model.predict(obs)
         obs, rewards, done, info = env.step(action)
         if done:
@@ -291,7 +307,7 @@ def main():
             env.reset()
     env.set_display(False)
 
-    # model.save("a2c_missile")
+#     model.save("a2c_missile_pe")
 
 
 if __name__ == "__main__":
